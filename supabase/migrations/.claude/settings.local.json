@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls d:/wwvs-project/apps/ops-server 2>/dev/null || echo \"Directory not found\")",
+      "Read(//d/wwvs-project/apps/ops-server/**)",
+      "Bash(node -e \"const {createHash} = require\\('crypto'\\); console.log\\(createHash\\('sha256'\\).update\\('01012345678'\\).digest\\('hex'\\)\\)\")"
+    ],
+    "additionalDirectories": [
+      "d:\\wwvs-project\\supabase\\seeds",
+      "d:\\wwvs-project\\apps\\auth-server\\src\\app\\api\\auth\\send-otp"
+    ]
+  }
+}

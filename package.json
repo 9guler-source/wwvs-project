@@ -1,0 +1,19 @@
+{
+  "name": "wwvs",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:auth": "npm run dev --workspace=apps/auth-server",
+    "dev:ops": "npm run dev --workspace=apps/ops-server",
+    "dev:count": "npm run dev --workspace=apps/count-server",
+    "dev:all": "concurrently \"npm run dev:auth\" \"npm run dev:ops\" \"npm run dev:count\""
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "typescript": "^5"
+  }
+}
