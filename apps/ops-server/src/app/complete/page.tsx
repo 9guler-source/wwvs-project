@@ -1,14 +1,130 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { VoteCertificate } from '@wwvs/shared'
+
+// Canvas API로 확인서 PNG 생성 — html2canvas 불필요, cross-origin 이슈 없음
+function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
+  const W = 800
+  const PAD = 44
+  const innerW = W - PAD * 2
+  const KF = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif'
+  const MONO = '"Courier New", monospace'
+
+  // 텍스트 줄 나눔 (측정용 임시 캔버스)
+  const mc = document.createElement('canvas').getContext('2d')!
+  function wrap(text: string, font: string): string[] {
+    mc.font = font
+    if (!text) return ['']
+    const lines: string[] = []
+    let s = 0
+    while (s < text.length) {
+      let e = text.length
+      while (mc.measureText(text.slice(s, e)).width > innerW && e > s + 1) e--
+      lines.push(text.slice(s, e))
+      s = e
+    }
+    return lines
+  }
+
+  const RI_FONT = `13px ${MONO}`
+  const HMAC_FONT = `11px ${MONO}`
+  const riLines = wrap(cert.publicRi, RI_FONT)
+  const hmacLines = wrap(cert.hmacSignature, HMAC_FONT)
+
+  const HEADER_H = 76
+  const ROW_H = 32
+  const LABEL_H = 22
+  const RI_LINE_H = 20
+  const HMAC_LINE_H = 17
+  const SEP = 14
+
+  const totalH = Math.ceil(
+    HEADER_H + PAD
+    + ROW_H * 2                                      // 선거ID, 선택항목
+    + SEP + LABEL_H + riLines.length * RI_LINE_H + SEP  // 공개용RI
+    + ROW_H                                           // 투표일시
+    + SEP + LABEL_H + hmacLines.length * HMAC_LINE_H  // HMAC
+    + PAD + 8,
+  )
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2)
+  const canvas = document.createElement('canvas')
+  canvas.width = W * dpr
+  canvas.height = totalH * dpr
+  const ctx = canvas.getContext('2d')!
+  ctx.scale(dpr, dpr)
+  ctx.textBaseline = 'top'
+
+  // 배경
+  ctx.fillStyle = '#f8fafc'
+  ctx.fillRect(0, 0, W, totalH)
+
+  // 헤더 바
+  ctx.fillStyle = '#1B2A6B'
+  ctx.fillRect(0, 0, W, HEADER_H)
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `bold 20px ${KF}`
+  ctx.fillText('WWVS 투표확인서', PAD, 16)
+  ctx.font = `12px ${KF}`
+  ctx.fillStyle = 'rgba(255,255,255,0.65)'
+  ctx.fillText('Who Whom Voting System', PAD, 46)
+
+  let y = HEADER_H + PAD
+
+  function row(label: string, value: string, bold = false) {
+    ctx.font = `12px ${KF}`
+    ctx.fillStyle = '#9ca3af'
+    ctx.fillText(label, PAD, y)
+    ctx.font = `${bold ? 'bold ' : ''}14px ${KF}`
+    ctx.fillStyle = '#111827'
+    ctx.fillText(value, PAD + 110, y)
+    y += ROW_H
+  }
+
+  row('선거 ID', `${cert.electionId.slice(0, 8)}…`)
+  row('선택 항목', cert.selectedOptionText, true)
+
+  // 구분선
+  y += 4
+  ctx.strokeStyle = '#d1d5db'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(PAD, y)
+  ctx.lineTo(W - PAD, y)
+  ctx.stroke()
+  y += SEP
+
+  // 공개용RI
+  ctx.font = `12px ${KF}`
+  ctx.fillStyle = '#9ca3af'
+  ctx.fillText('확인 코드 (공개용RI)', PAD, y)
+  y += LABEL_H
+  ctx.font = RI_FONT
+  ctx.fillStyle = '#1B2A6B'
+  for (const line of riLines) { ctx.fillText(line, PAD, y); y += RI_LINE_H }
+  y += SEP
+
+  row('투표 일시', new Date(cert.createdAt).toLocaleString('ko-KR'))
+  y += SEP
+
+  // HMAC 서명
+  ctx.font = `12px ${KF}`
+  ctx.fillStyle = '#9ca3af'
+  ctx.fillText('HMAC 서명', PAD, y)
+  y += LABEL_H
+  ctx.font = HMAC_FONT
+  ctx.fillStyle = '#6b7280'
+  for (const line of hmacLines) { ctx.fillText(line, PAD, y); y += HMAC_LINE_H }
+
+  return canvas
+}
 
 export default function CompletePage() {
   const [certificate, setCertificate] = useState<VoteCertificate | null>(null)
   const [copied, setCopied] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [capturing, setCapturing] = useState(false)
-  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -23,22 +139,23 @@ export default function CompletePage() {
     }
   }, [])
 
-  const handleCapture = async () => {
-    if (!certificate || !cardRef.current) return
+  const handleCapture = () => {
+    if (!certificate) return
     setCapturing(true)
-    try {
-      const html2canvas = (await import('html2canvas')).default
-      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true })
-      const link = document.createElement('a')
-      const prefix = certificate.publicRi.slice(0, 8)
-      link.download = `wwvs_확인서_${prefix}.png`
-      link.href = canvas.toDataURL('image/png')
-      link.click()
-    } catch (e) {
-      console.error('[capture] 실패', e)
-    } finally {
-      setCapturing(false)
-    }
+    // requestAnimationFrame으로 "캡쳐 중…" 버튼 렌더 후 실행
+    requestAnimationFrame(() => {
+      try {
+        const canvas = generateCertificateCanvas(certificate)
+        const link = document.createElement('a')
+        link.download = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.png`
+        link.href = canvas.toDataURL('image/png')
+        link.click()
+      } catch (e) {
+        console.error('[capture] 실패', e)
+      } finally {
+        setCapturing(false)
+      }
+    })
   }
 
   const handleCopyCode = () => {
@@ -88,8 +205,8 @@ export default function CompletePage() {
           <p className="text-sm text-gray-500 mt-1">귀하의 소중한 한 표가 접수되었습니다</p>
         </div>
 
-        {/* 캡쳐 대상 확인서 카드 */}
-        <div ref={cardRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
+        {/* 확인서 카드 (화면 표시용) */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             투표확인서
           </h2>
