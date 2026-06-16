@@ -106,8 +106,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: '선거 설정 오류 (암호화 키 불일치)' }, { status: 500 })
   }
 
-  // 공개용RI 생성: {앞마크}_{신규RI}_{1차마크}_{2차마크}
-  const publicRi = buildPublicRi(picked.mark_word, newRi, f1Salt, f2Salt)
+  // 공개용RI 생성: {앞마크}_{신규RI}_{1차마크}_{2차마크}_{투표내역암호화값}
+  const publicRi = buildPublicRi(picked.mark_word, newRi, f1Salt, f2Salt, option.option_text)
 
   // 투표확인서 생성 (공개용RI 기반)
   const certificateData = {
