@@ -15,7 +15,7 @@ async function retryPendingCompletions(): Promise<void> {
   const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('pending_vote_completions')
-    .select('id, original_ri, new_ri, retry_count')
+    .select('id, original_ri, retry_count')
     .lte('next_retry_at', now)
     .limit(10)
 
@@ -25,7 +25,7 @@ async function retryPendingCompletions(): Promise<void> {
   }
 
   for (const item of data ?? []) {
-    const sent = await trySendCompletionToAuth(item.original_ri as string, (item.new_ri as string) ?? '')
+    const sent = await trySendCompletionToAuth(item.original_ri as string)
     if (sent) {
       await supabase.from('pending_vote_completions').delete().eq('id', item.id)
       console.log('[retry-workers] 완료신호 전달 성공', String(item.original_ri).slice(0, 8))

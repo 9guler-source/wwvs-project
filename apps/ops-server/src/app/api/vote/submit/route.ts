@@ -129,10 +129,10 @@ export async function POST(request: NextRequest) {
   }
 
   // 인증서버에 투표 완료 신호 전송 (1회 시도) — 실패 시 pending_vote_completions에 저장
-  const completionSent = await trySendCompletionToAuth(ri, publicRi)
+  const completionSent = await trySendCompletionToAuth(ri)
   if (!completionSent) {
     console.error('[submit] 완료신호 전송 실패 — 대기열 저장', { ri: ri.slice(0, 8) })
-    await supabase.from('pending_vote_completions').insert({ original_ri: ri, new_ri: publicRi })
+    await supabase.from('pending_vote_completions').insert({ original_ri: ri })
   }
 
   return NextResponse.json({ success: true, certificate })

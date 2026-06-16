@@ -71,12 +71,11 @@ export async function POST(request: NextRequest) {
     .update({ ri_issued_at: now.toISOString() })
     .eq('id', voter.id)
 
-  // RI-투표자 매핑 저장 (투표 완료 신호 수신 시 is_voted 갱신 + SMS 발송에 사용)
+  // RI-투표자 매핑 저장 (투표 완료 신호 수신 시 is_voted 갱신에 사용)
   await supabase.from('ri_voter_map').insert({
     ri_value: ri,
     voter_id: voter.id,
     expires_at: expiresAt.toISOString(),
-    phone_number: normalized,
   })
 
   // 운영서버에 RI 등록

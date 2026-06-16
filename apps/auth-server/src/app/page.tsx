@@ -108,8 +108,11 @@ export default function Home() {
 
         {/* 시뮬레이션 모드 경고 배너 — SIMULATION_MODE=false 시 렌더링 안 됨 */}
         {SIMULATION_MODE && (
-          <div className="mb-4 px-4 py-3 bg-red-600 text-white text-sm font-bold rounded-xl text-center leading-snug">
-            ⚠ 시뮬레이션 모드 — 실제 서비스에서는 사용 금지
+          <div className="mb-4 px-4 py-3 bg-red-600 text-white rounded-xl text-center leading-snug">
+            <p className="text-sm font-bold">⚠ 시뮬레이션 모드 — 실제 서비스에서는 사용 금지</p>
+            <p className="text-xs font-normal text-yellow-200 mt-1 italic">
+              시뮬레이션과 실제 투표는 관리자의 스위치 조작으로 쉽게 전환됩니다
+            </p>
           </div>
         )}
 

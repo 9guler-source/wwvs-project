@@ -1,12 +1,14 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { VoteCertificate } from '@wwvs/shared'
 
 export default function CompletePage() {
   const [certificate, setCertificate] = useState<VoteCertificate | null>(null)
   const [copied, setCopied] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
+  const [capturing, setCapturing] = useState(false)
+  const cardRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -20,6 +22,24 @@ export default function CompletePage() {
       }
     }
   }, [])
+
+  const handleCapture = async () => {
+    if (!certificate || !cardRef.current) return
+    setCapturing(true)
+    try {
+      const html2canvas = (await import('html2canvas')).default
+      const canvas = await html2canvas(cardRef.current, { scale: 2, useCORS: true })
+      const link = document.createElement('a')
+      const prefix = certificate.publicRi.slice(0, 8)
+      link.download = `wwvs_확인서_${prefix}.png`
+      link.href = canvas.toDataURL('image/png')
+      link.click()
+    } catch (e) {
+      console.error('[capture] 실패', e)
+    } finally {
+      setCapturing(false)
+    }
+  }
 
   const handleCopyCode = () => {
     if (!certificate) return
@@ -68,7 +88,8 @@ export default function CompletePage() {
           <p className="text-sm text-gray-500 mt-1">귀하의 소중한 한 표가 접수되었습니다</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
+        {/* 캡쳐 대상 확인서 카드 */}
+        <div ref={cardRef} className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             투표확인서
           </h2>
@@ -102,6 +123,12 @@ export default function CompletePage() {
                 {new Date(certificate.createdAt).toLocaleString('ko-KR')}
               </span>
             </div>
+            <div>
+              <p className="text-gray-500 mb-1 text-xs">HMAC 서명</p>
+              <p className="font-mono text-[10px] text-gray-600 bg-gray-50 px-3 py-2 rounded-lg break-all">
+                {certificate.hmacSignature}
+              </p>
+            </div>
           </div>
         </div>
 
@@ -109,6 +136,21 @@ export default function CompletePage() {
           이 확인서를 저장해두세요. 투표 종료 후 확인 코드로 본인 투표를 검증할 수 있습니다.
         </div>
 
+        {/* 캡쳐 경고 문구 */}
+        <p className="text-red-600 font-bold text-base text-center mb-2">
+          ⚠ 반드시 확인서를 캡쳐하세요! 나중에 본인 투표 확인에 필요합니다.
+        </p>
+
+        {/* 확인서 캡쳐 버튼 */}
+        <button
+          onClick={handleCapture}
+          disabled={capturing}
+          className="w-full py-5 mb-3 bg-red-600 text-white text-lg font-bold rounded-xl active:scale-95 transition-all disabled:opacity-60"
+        >
+          {capturing ? '캡쳐 중…' : '📸 확인서 캡쳐'}
+        </button>
+
+        {/* 확인서 텍스트 복사 버튼 */}
         <button
           onClick={handleCopy}
           className="w-full py-4 bg-[#1B2A6B] text-white font-semibold rounded-xl active:scale-95 transition-all"
