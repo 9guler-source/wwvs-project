@@ -121,7 +121,6 @@ export default function CompletePage() {
 
   useEffect(() => {
     setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent))
-
     const params = new URLSearchParams(window.location.search)
     const electionId = params.get('electionId') ?? ''
     const stored = localStorage.getItem(`wwvs_certificate_${electionId}`)
@@ -130,60 +129,98 @@ export default function CompletePage() {
     }
   }, [])
 
+  // ── 텍스트 파일 저장 (Canvas 불필요 — 100% 동작) ──────────────────────────
+  const handleDownloadText = () => {
+    if (!certificate) return
+    const lines = [
+      '========================================',
+      '       WWVS 투표확인서',
+      '========================================',
+      '',
+      `선거 ID   : ${certificate.electionId}`,
+      `선택 항목 : ${certificate.selectedOptionText}`,
+      '',
+      `공개용 RI : ${certificate.publicRi}`,
+      '',
+      `투표 일시 : ${new Date(certificate.createdAt).toLocaleString('ko-KR')}`,
+      '',
+      `HMAC 서명 : ${certificate.hmacSignature}`,
+      '',
+      '========================================',
+      `저장 시각 : ${new Date().toLocaleString('ko-KR')}`,
+      '========================================',
+    ]
+    try {
+      const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.txt`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) {
+      alert(`텍스트 저장 실패: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  // ── 이미지 캡쳐 (Canvas API) ───────────────────────────────────────────────
   const handleCapture = () => {
     if (!certificate) return
+
+    // ① 클릭 이벤트 진단 — alert가 뜨면 onClick은 정상 연결된 것
+    alert('📸 캡쳐 버튼 클릭 확인. 이미지 생성을 시작합니다.')
+
     setCapturing(true)
     setCaptureError(null)
 
     requestAnimationFrame(() => {
-      // Step 1: Canvas 2D 지원 확인 (가장 단순한 테스트)
-      let canvas: HTMLCanvasElement
+      // ② toBlob 포함 전체 흐름을 하나의 try-catch로 감쌈
+      //    (이전 코드는 toBlob 호출부가 try-catch 밖에 있어 오류 시 무음 실패)
       try {
         const testCtx = document.createElement('canvas').getContext('2d')
         if (!testCtx) throw new Error('Canvas 2D context 미지원 — 브라우저/기기 문제')
 
-        // Step 2: 확인서 Canvas 생성
-        canvas = generateCertificateCanvas(certificate)
+        const canvas = generateCertificateCanvas(certificate)
         if (!canvas.width || !canvas.height) {
           throw new Error(`캔버스 크기 오류: ${canvas.width}×${canvas.height}`)
         }
+        if (typeof canvas.toBlob !== 'function') {
+          throw new Error('canvas.toBlob() 미지원 — 아래 텍스트 파일 저장 버튼을 사용하세요')
+        }
+
+        const filename = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.png`
+        const iosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
+
+        // ③ toBlob 콜백도 try-catch 안에서 처리
+        canvas.toBlob((blob) => {
+          try {
+            if (!blob) throw new Error('blob null 반환 — canvas.toBlob 실패')
+            const url = URL.createObjectURL(blob)
+            if (iosDevice) {
+              window.open(url, '_blank')
+              setTimeout(() => URL.revokeObjectURL(url), 5000)
+            } else {
+              const link = document.createElement('a')
+              link.href = url
+              link.download = filename
+              document.body.appendChild(link)
+              link.click()
+              document.body.removeChild(link)
+              setTimeout(() => URL.revokeObjectURL(url), 1000)
+            }
+          } catch (err) {
+            setCaptureError(`다운로드 실패: ${err instanceof Error ? err.message : String(err)}`)
+          } finally {
+            setCapturing(false)
+          }
+        }, 'image/png')
+
       } catch (err) {
         setCaptureError(`캡쳐 실패: ${err instanceof Error ? err.message : String(err)}`)
         setCapturing(false)
-        return
       }
-
-      const filename = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.png`
-      const iosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
-
-      // Step 3: toBlob → URL.createObjectURL (toDataURL보다 안정적)
-      canvas.toBlob((blob) => {
-        try {
-          if (!blob) throw new Error('blob 생성 실패 (null 반환) — Canvas가 비어있거나 보안 정책 차단')
-
-          const url = URL.createObjectURL(blob)
-
-          if (iosDevice) {
-            // iOS Safari: <a download>가 data URL/blob에서 동작 안 함 → 새 탭에서 열기
-            // 사용자가 이미지를 길게 눌러 "사진에 저장"
-            window.open(url, '_blank')
-            setTimeout(() => URL.revokeObjectURL(url), 5000)
-          } else {
-            // 일반 브라우저: <a> 태그를 반드시 DOM에 붙인 뒤 click (모바일 Chrome 등 필수)
-            const link = document.createElement('a')
-            link.href = url
-            link.download = filename
-            document.body.appendChild(link)
-            link.click()
-            document.body.removeChild(link)
-            setTimeout(() => URL.revokeObjectURL(url), 1000)
-          }
-        } catch (err) {
-          setCaptureError(`다운로드 실패: ${err instanceof Error ? err.message : String(err)}`)
-        } finally {
-          setCapturing(false)
-        }
-      }, 'image/png')
     })
   }
 
@@ -281,32 +318,41 @@ export default function CompletePage() {
           이 확인서를 저장해두세요. 투표 종료 후 확인 코드로 본인 투표를 검증할 수 있습니다.
         </div>
 
-        {/* 에러 표시 박스 */}
+        {/* 에러 표시 */}
         {captureError && (
           <div className="mb-3 px-4 py-3 bg-red-100 border border-red-400 rounded-xl text-sm text-red-800 break-all font-mono">
             {captureError}
           </div>
         )}
 
-        <p className="text-red-600 font-bold text-base text-center mb-2">
-          ⚠ 반드시 확인서를 캡쳐하세요! 나중에 본인 투표 확인에 필요합니다.
+        <p className="text-red-600 font-bold text-base text-center mb-3">
+          ⚠ 반드시 확인서를 저장하세요! 나중에 본인 투표 확인에 필요합니다.
         </p>
 
-        {/* iOS 안내 */}
         {isIOS && (
           <p className="text-xs text-gray-500 text-center mb-2">
-            iPhone/iPad: 버튼 클릭 후 열리는 이미지를 길게 눌러 사진에 저장하세요.
+            iPhone/iPad: 이미지 캡쳐 시 새 탭에서 열립니다. 길게 눌러 사진에 저장하세요.
           </p>
         )}
 
+        {/* 이미지 캡쳐 버튼 (Canvas API + alert 진단 포함) */}
         <button
           onClick={handleCapture}
           disabled={capturing}
-          className="w-full py-5 mb-3 bg-red-600 text-white text-lg font-bold rounded-xl active:scale-95 transition-all disabled:opacity-60"
+          className="w-full py-5 mb-2 bg-red-600 text-white text-lg font-bold rounded-xl active:scale-95 transition-all disabled:opacity-60"
         >
-          {capturing ? '캡쳐 중…' : '📸 확인서 캡쳐'}
+          {capturing ? '캡쳐 중…' : '📸 확인서 이미지 저장'}
         </button>
 
+        {/* 텍스트 파일 저장 (Canvas 불필요 — 모든 환경에서 동작) */}
+        <button
+          onClick={handleDownloadText}
+          className="w-full py-4 mb-2 bg-green-600 text-white font-semibold rounded-xl active:scale-95 transition-all"
+        >
+          📄 확인서 텍스트 파일 저장
+        </button>
+
+        {/* 클립보드 복사 */}
         <button
           onClick={handleCopy}
           className="w-full py-4 bg-[#1B2A6B] text-white font-semibold rounded-xl active:scale-95 transition-all"
