@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import type { VoteCertificate } from '@wwvs/shared'
 
-// Canvas API로 확인서 PNG 생성 — html2canvas 불필요, cross-origin 이슈 없음
 function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
   const W = 800
   const PAD = 44
@@ -11,7 +10,6 @@ function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
   const KF = '"Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif'
   const MONO = '"Courier New", monospace'
 
-  // 텍스트 줄 나눔 (측정용 임시 캔버스)
   const mc = document.createElement('canvas').getContext('2d')!
   function wrap(text: string, font: string): string[] {
     mc.font = font
@@ -41,10 +39,10 @@ function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
 
   const totalH = Math.ceil(
     HEADER_H + PAD
-    + ROW_H * 2                                      // 선거ID, 선택항목
-    + SEP + LABEL_H + riLines.length * RI_LINE_H + SEP  // 공개용RI
-    + ROW_H                                           // 투표일시
-    + SEP + LABEL_H + hmacLines.length * HMAC_LINE_H  // HMAC
+    + ROW_H * 2
+    + SEP + LABEL_H + riLines.length * RI_LINE_H + SEP
+    + ROW_H
+    + SEP + LABEL_H + hmacLines.length * HMAC_LINE_H
     + PAD + 8,
   )
 
@@ -56,11 +54,8 @@ function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
   ctx.scale(dpr, dpr)
   ctx.textBaseline = 'top'
 
-  // 배경
   ctx.fillStyle = '#f8fafc'
   ctx.fillRect(0, 0, W, totalH)
-
-  // 헤더 바
   ctx.fillStyle = '#1B2A6B'
   ctx.fillRect(0, 0, W, HEADER_H)
   ctx.fillStyle = '#ffffff'
@@ -85,17 +80,14 @@ function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
   row('선거 ID', `${cert.electionId.slice(0, 8)}…`)
   row('선택 항목', cert.selectedOptionText, true)
 
-  // 구분선
   y += 4
   ctx.strokeStyle = '#d1d5db'
   ctx.lineWidth = 1
   ctx.beginPath()
-  ctx.moveTo(PAD, y)
-  ctx.lineTo(W - PAD, y)
+  ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y)
   ctx.stroke()
   y += SEP
 
-  // 공개용RI
   ctx.font = `12px ${KF}`
   ctx.fillStyle = '#9ca3af'
   ctx.fillText('확인 코드 (공개용RI)', PAD, y)
@@ -108,7 +100,6 @@ function generateCertificateCanvas(cert: VoteCertificate): HTMLCanvasElement {
   row('투표 일시', new Date(cert.createdAt).toLocaleString('ko-KR'))
   y += SEP
 
-  // HMAC 서명
   ctx.font = `12px ${KF}`
   ctx.fillStyle = '#9ca3af'
   ctx.fillText('HMAC 서명', PAD, y)
@@ -125,36 +116,74 @@ export default function CompletePage() {
   const [copied, setCopied] = useState(false)
   const [copiedCode, setCopiedCode] = useState(false)
   const [capturing, setCapturing] = useState(false)
+  const [captureError, setCaptureError] = useState<string | null>(null)
+  const [isIOS, setIsIOS] = useState(false)
 
   useEffect(() => {
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent))
+
     const params = new URLSearchParams(window.location.search)
     const electionId = params.get('electionId') ?? ''
     const stored = localStorage.getItem(`wwvs_certificate_${electionId}`)
     if (stored) {
-      try {
-        setCertificate(JSON.parse(stored))
-      } catch {
-        // ignore
-      }
+      try { setCertificate(JSON.parse(stored)) } catch { /* ignore */ }
     }
   }, [])
 
   const handleCapture = () => {
     if (!certificate) return
     setCapturing(true)
-    // requestAnimationFrame으로 "캡쳐 중…" 버튼 렌더 후 실행
+    setCaptureError(null)
+
     requestAnimationFrame(() => {
+      // Step 1: Canvas 2D 지원 확인 (가장 단순한 테스트)
+      let canvas: HTMLCanvasElement
       try {
-        const canvas = generateCertificateCanvas(certificate)
-        const link = document.createElement('a')
-        link.download = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.png`
-        link.href = canvas.toDataURL('image/png')
-        link.click()
-      } catch (e) {
-        console.error('[capture] 실패', e)
-      } finally {
+        const testCtx = document.createElement('canvas').getContext('2d')
+        if (!testCtx) throw new Error('Canvas 2D context 미지원 — 브라우저/기기 문제')
+
+        // Step 2: 확인서 Canvas 생성
+        canvas = generateCertificateCanvas(certificate)
+        if (!canvas.width || !canvas.height) {
+          throw new Error(`캔버스 크기 오류: ${canvas.width}×${canvas.height}`)
+        }
+      } catch (err) {
+        setCaptureError(`캡쳐 실패: ${err instanceof Error ? err.message : String(err)}`)
         setCapturing(false)
+        return
       }
+
+      const filename = `wwvs_확인서_${certificate.publicRi.slice(0, 8)}.png`
+      const iosDevice = /iPad|iPhone|iPod/.test(navigator.userAgent)
+
+      // Step 3: toBlob → URL.createObjectURL (toDataURL보다 안정적)
+      canvas.toBlob((blob) => {
+        try {
+          if (!blob) throw new Error('blob 생성 실패 (null 반환) — Canvas가 비어있거나 보안 정책 차단')
+
+          const url = URL.createObjectURL(blob)
+
+          if (iosDevice) {
+            // iOS Safari: <a download>가 data URL/blob에서 동작 안 함 → 새 탭에서 열기
+            // 사용자가 이미지를 길게 눌러 "사진에 저장"
+            window.open(url, '_blank')
+            setTimeout(() => URL.revokeObjectURL(url), 5000)
+          } else {
+            // 일반 브라우저: <a> 태그를 반드시 DOM에 붙인 뒤 click (모바일 Chrome 등 필수)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = filename
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            setTimeout(() => URL.revokeObjectURL(url), 1000)
+          }
+        } catch (err) {
+          setCaptureError(`다운로드 실패: ${err instanceof Error ? err.message : String(err)}`)
+        } finally {
+          setCapturing(false)
+        }
+      }, 'image/png')
     })
   }
 
@@ -205,7 +234,6 @@ export default function CompletePage() {
           <p className="text-sm text-gray-500 mt-1">귀하의 소중한 한 표가 접수되었습니다</p>
         </div>
 
-        {/* 확인서 카드 (화면 표시용) */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5 mb-4">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
             투표확인서
@@ -253,12 +281,24 @@ export default function CompletePage() {
           이 확인서를 저장해두세요. 투표 종료 후 확인 코드로 본인 투표를 검증할 수 있습니다.
         </div>
 
-        {/* 캡쳐 경고 문구 */}
+        {/* 에러 표시 박스 */}
+        {captureError && (
+          <div className="mb-3 px-4 py-3 bg-red-100 border border-red-400 rounded-xl text-sm text-red-800 break-all font-mono">
+            {captureError}
+          </div>
+        )}
+
         <p className="text-red-600 font-bold text-base text-center mb-2">
           ⚠ 반드시 확인서를 캡쳐하세요! 나중에 본인 투표 확인에 필요합니다.
         </p>
 
-        {/* 확인서 캡쳐 버튼 */}
+        {/* iOS 안내 */}
+        {isIOS && (
+          <p className="text-xs text-gray-500 text-center mb-2">
+            iPhone/iPad: 버튼 클릭 후 열리는 이미지를 길게 눌러 사진에 저장하세요.
+          </p>
+        )}
+
         <button
           onClick={handleCapture}
           disabled={capturing}
@@ -267,7 +307,6 @@ export default function CompletePage() {
           {capturing ? '캡쳐 중…' : '📸 확인서 캡쳐'}
         </button>
 
-        {/* 확인서 텍스트 복사 버튼 */}
         <button
           onClick={handleCopy}
           className="w-full py-4 bg-[#1B2A6B] text-white font-semibold rounded-xl active:scale-95 transition-all"
