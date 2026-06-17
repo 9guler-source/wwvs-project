@@ -17,6 +17,7 @@ export default function Home() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [simulationOtp, setSimulationOtp] = useState('')
+  const [showSimGuide, setShowSimGuide] = useState(SIMULATION_MODE)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -103,7 +104,51 @@ export default function Home() {
   }
 
   return (
-    <main className="flex min-h-screen items-start justify-center px-4 pt-16 pb-8">
+    <>
+      {/* 시뮬레이션 안내 팝업 — SIMULATION_MODE=false 시 절대 렌더링 안 됨 */}
+      {SIMULATION_MODE && showSimGuide && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto bg-red-700 rounded-2xl shadow-2xl text-white">
+            <div className="px-6 pt-6 pb-3">
+              <span className="inline-block bg-red-900/60 text-yellow-200 text-xs font-bold tracking-wider px-3 py-1 rounded-full">
+                ⚠ 시뮬레이션 모드
+              </span>
+              <h2 className="text-xl font-bold mt-3">시뮬레이션 안내</h2>
+            </div>
+            <div className="px-6 pb-4 text-sm leading-relaxed text-red-100">
+              <p className="mb-3">
+                이 시뮬레이션에 사용할 수 있는 테스트 번호입니다.<br />
+                아래 번호 중 하나를 입력하면 투표를 체험할 수 있습니다.
+              </p>
+              <ul className="space-y-1.5 font-mono text-xs bg-red-900/40 rounded-xl p-4">
+                <li>• 010-7777-7777 (1개)</li>
+                <li>• 010-1111-1111 ~ 010-1111-1199 (89개)</li>
+                <li>• 010-2222-0000 ~ 010-2222-0999 (1,000개)</li>
+                <li>• 010-3333-0000 ~ 010-3333-0999 (1,000개)</li>
+                <li>• 010-4444-0000 ~ 010-4444-0999 (1,000개)</li>
+                <li>• 010-5555-0000 ~ 010-5555-0999 (1,000개)</li>
+                <li>• 010-6666-0000 ~ 010-6666-0999 (1,000개)</li>
+                <li>• 010-7777-0000 ~ 010-7777-0999 (1,000개)</li>
+                <li>• 010-8888-0000 ~ 010-8888-0999 (1,000개)</li>
+                <li>• 010-9999-0000 ~ 010-9999-0999 (1,000개)</li>
+              </ul>
+              <p className="mt-3 text-red-200 text-xs">
+                명부에 없는 번호를 입력하면 &lsquo;투표권이 없습니다&rsquo; 안내가 표시됩니다.
+              </p>
+            </div>
+            <div className="px-6 pb-6">
+              <button
+                onClick={() => setShowSimGuide(false)}
+                className="w-full py-3 bg-white text-red-700 font-bold rounded-xl text-sm tracking-wide hover:bg-red-50 transition-colors"
+              >
+                확인, 시작하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <main className="flex min-h-screen items-start justify-center px-4 pt-16 pb-8">
       <div className="w-full max-w-[430px]">
 
         {/* 시뮬레이션 모드 경고 배너 — SIMULATION_MODE=false 시 렌더링 안 됨 */}
@@ -185,5 +230,6 @@ export default function Home() {
         </p>
       </div>
     </main>
+    </>
   )
 }
