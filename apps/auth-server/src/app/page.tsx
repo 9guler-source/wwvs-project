@@ -108,19 +108,19 @@ export default function Home() {
       {/* 시뮬레이션 안내 팝업 — SIMULATION_MODE=false 시 절대 렌더링 안 됨 */}
       {SIMULATION_MODE && showSimGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto bg-red-700 rounded-2xl shadow-2xl text-white">
+          <div className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto bg-[#1A3A1A] border border-[#7BC47B]/50 rounded-2xl shadow-2xl text-white">
             <div className="px-6 pt-6 pb-3">
-              <span className="inline-block bg-red-900/60 text-yellow-200 text-xs font-bold tracking-wider px-3 py-1 rounded-full">
+              <span className="inline-block bg-[#2A5A2A]/70 text-[#7BC47B] text-xs font-bold tracking-wider px-3 py-1 rounded-full">
                 ⚠ 시뮬레이션 모드
               </span>
-              <h2 className="text-xl font-bold mt-3">시뮬레이션 안내</h2>
+              <h2 className="text-xl font-bold mt-3 text-[#7BC47B]">시뮬레이션 안내</h2>
             </div>
-            <div className="px-6 pb-4 text-sm leading-relaxed text-red-100">
+            <div className="px-6 pb-4 text-sm leading-relaxed text-white">
               <p className="mb-3">
                 이 시뮬레이션에 사용할 수 있는 테스트 번호입니다.<br />
                 아래 번호 중 하나를 입력하면 투표를 체험할 수 있습니다.
               </p>
-              <ul className="space-y-1.5 font-mono text-xs bg-red-900/40 rounded-xl p-4">
+              <ul className="space-y-1.5 font-mono text-xs bg-[#2A5A2A]/40 rounded-xl p-4">
                 <li>• 010-7777-7777 (1개)</li>
                 <li>• 010-1111-1111 ~ 010-1111-1199 (89개)</li>
                 <li>• 010-2222-0000 ~ 010-2222-0999 (1,000개)</li>
@@ -132,14 +132,14 @@ export default function Home() {
                 <li>• 010-8888-0000 ~ 010-8888-0999 (1,000개)</li>
                 <li>• 010-9999-0000 ~ 010-9999-0999 (1,000개)</li>
               </ul>
-              <p className="mt-3 text-red-200 text-xs">
+              <p className="mt-3 text-green-300 text-xs">
                 명부에 없는 번호를 입력하면 &lsquo;투표권이 없습니다&rsquo; 안내가 표시됩니다.
               </p>
             </div>
             <div className="px-6 pb-6">
               <button
                 onClick={() => setShowSimGuide(false)}
-                className="w-full py-3 bg-white text-red-700 font-bold rounded-xl text-sm tracking-wide hover:bg-red-50 transition-colors"
+                className="w-full py-3 bg-[#4CAF50] text-white font-bold rounded-xl text-sm tracking-wide hover:bg-[#45A049] transition-colors"
               >
                 확인, 시작하기
               </button>
