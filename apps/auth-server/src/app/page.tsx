@@ -5,8 +5,6 @@ import PhoneInput from '@/components/PhoneInput'
 import OtpInput from '@/components/OtpInput'
 import LoadingScreen from '@/components/LoadingScreen'
 
-const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true'
-
 type Step = 'phone' | 'otp' | 'redirecting'
 
 export default function Home() {
@@ -17,12 +15,20 @@ export default function Home() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [simulationOtp, setSimulationOtp] = useState('')
-  const [showSimGuide, setShowSimGuide] = useState(SIMULATION_MODE)
+  const [isSimulation, setIsSimulation] = useState(false)
+  const [showSimGuide, setShowSimGuide] = useState(false)
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const id = params.get('electionId') ?? process.env.NEXT_PUBLIC_DEFAULT_ELECTION_ID ?? ''
     setElectionId(id)
+    fetch('/api/auth/mode')
+      .then((r) => r.json())
+      .then((d) => {
+        setIsSimulation(d.isSimulation)
+        setShowSimGuide(d.isSimulation)
+      })
+      .catch(() => {})
   }, [])
 
   const handleSendOtp = async () => {
@@ -36,7 +42,7 @@ export default function Home() {
       })
       const data = await res.json()
       if (data.success) {
-        if (SIMULATION_MODE && data.otp) {
+        if (isSimulation && data.otp) {
           setSimulationOtp(data.otp)
         }
         setStep('otp')
@@ -90,7 +96,7 @@ export default function Home() {
       })
       const data = await res.json()
       if (data.success) {
-        if (SIMULATION_MODE && data.otp) {
+        if (isSimulation && data.otp) {
           setSimulationOtp(data.otp)
         }
       } else {
@@ -105,8 +111,8 @@ export default function Home() {
 
   return (
     <>
-      {/* 시뮬레이션 안내 팝업 — SIMULATION_MODE=false 시 절대 렌더링 안 됨 */}
-      {SIMULATION_MODE && showSimGuide && (
+      {/* 시뮬레이션 안내 팝업 — isSimulation=false 시 절대 렌더링 안 됨 */}
+      {isSimulation && showSimGuide && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
           <div className="w-full max-w-[480px] max-h-[90vh] overflow-y-auto bg-[#1A3A1A] border border-[#7BC47B]/50 rounded-2xl shadow-2xl text-white">
             <div className="px-6 pt-6 pb-3">
@@ -151,8 +157,8 @@ export default function Home() {
       <main className="flex min-h-screen items-start justify-center px-4 pt-16 pb-8">
       <div className="w-full max-w-[430px]">
 
-        {/* 시뮬레이션 모드 경고 배너 — SIMULATION_MODE=false 시 렌더링 안 됨 */}
-        {SIMULATION_MODE && (
+        {/* 시뮬레이션 모드 경고 배너 — isSimulation=false 시 렌더링 안 됨 */}
+        {isSimulation && (
           <div className="mb-4 px-4 py-3 bg-red-600 text-white rounded-xl text-center leading-snug">
             <p className="text-sm font-bold">⚠ 시뮬레이션 모드 — 실제 서비스에서는 사용 금지</p>
             <p className="text-xs font-normal text-yellow-200 mt-1 italic">
@@ -181,7 +187,7 @@ export default function Home() {
                 <p className="text-sm text-gray-500 mt-1">
                   {step === 'phone'
                     ? '투표 참여를 위해 본인 인증을 진행합니다.'
-                    : SIMULATION_MODE
+                    : isSimulation
                     ? '[시뮬레이션] 아래 인증번호를 확인하여 입력해주세요.'
                     : '발송된 인증번호를 입력해주세요.'}
                 </p>
@@ -193,8 +199,8 @@ export default function Home() {
                 </div>
               )}
 
-              {/* 시뮬레이션 OTP 표시 박스 — SIMULATION_MODE=true이고 OTP가 있을 때만 표시 */}
-              {SIMULATION_MODE && step === 'otp' && simulationOtp && (
+              {/* 시뮬레이션 OTP 표시 박스 — isSimulation=true이고 OTP가 있을 때만 표시 */}
+              {isSimulation && step === 'otp' && simulationOtp && (
                 <div className="mb-4 px-4 py-4 bg-yellow-50 border-2 border-yellow-400 rounded-xl text-center">
                   <p className="text-xs text-yellow-700 font-semibold mb-1">[시뮬레이션] 인증번호</p>
                   <p className="text-3xl font-mono font-bold text-yellow-900 tracking-[0.3em]">

@@ -3,8 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { hashPhone, normalizePhone, isValidKoreanPhone } from '@/lib/phone-hash'
 import { generateOtp } from '@/lib/otp-generator'
 import { sendOtpSms } from '@/lib/twilio'
-
-const SIMULATION_MODE = process.env.NEXT_PUBLIC_SIMULATION_MODE === 'true'
+import { getSimulationMode } from '@/lib/getMode'
 
 // IP당 분당 3회 제한 (MVP 수준 인메모리)
 const rateLimitMap = new Map<string, number[]>()
@@ -23,6 +22,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const isSimulation = await getSimulationMode()
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
 
   if (isRateLimited(ip)) {
@@ -98,8 +98,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: '서버 오류가 발생했습니다' }, { status: 500 })
   }
 
-  // SIMULATION_MODE: Twilio 호출 없이 OTP를 응답에 포함하여 반환
-  if (SIMULATION_MODE) {
+  // 시뮬레이션 모드: Twilio 호출 없이 OTP를 응답에 포함하여 반환
+  if (isSimulation) {
     console.log(`[SIMULATION] OTP 생성 완료 (Twilio 미호출) → ${normalized} | OTP: ${otp}`)
     return NextResponse.json({
       success: true,

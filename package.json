@@ -10,7 +10,8 @@
     "dev:auth": "npm run dev --workspace=apps/auth-server",
     "dev:ops": "npm run dev --workspace=apps/ops-server",
     "dev:count": "npm run dev --workspace=apps/count-server",
-    "dev:all": "concurrently \"npm run dev:auth\" \"npm run dev:ops\" \"npm run dev:count\""
+    "dev:admin": "npm run dev --workspace=apps/admin-panel",
+    "dev:all": "concurrently \"npm run dev:auth\" \"npm run dev:ops\" \"npm run dev:count\" \"npm run dev:admin\""
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
